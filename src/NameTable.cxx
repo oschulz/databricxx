@@ -27,6 +27,10 @@ using namespace std;
 
 namespace dbrx {
 
+GlobalObject::Ptr<NameTable> dbrx::NameTable::s_globalNameTable;
+namespace { GlobalObject::Deleter<NameTable> deleter(dbrx::NameTable::s_globalNameTable); }
+
+
 struct NameTable::Internals {
 	using Mutex = std::mutex;
 	using LockGuard = std::lock_guard<Mutex>;
@@ -57,12 +61,6 @@ struct NameTable::Internals {
 	std::vector< std::unique_ptr<std::string> > strings;
 	std::unordered_map<ConstStringRef, Name, ConstStringRef::Hash> stringMap;
 };
-
-
-NameTable& NameTable::global() {
-	static NameTable globalTable;
-	return globalTable;
-}
 
 
 Name NameTable::resolve(const std::string &s) {

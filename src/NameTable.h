@@ -18,19 +18,56 @@
 #ifndef DBRX_NAMETABLE_H
 #define DBRX_NAMETABLE_H
 
+#include <atomic>
+#include <memory>
+
 #include "Name.h"
 
 
 namespace dbrx {
 
 
+class GlobalObject final {
+public:
+	template<typename T> using Ptr = std::atomic<T*>;
+
+	template<typename T> class Deleter final {
+	protected:
+		Ptr<T>& m_ptr;
+
+	public:
+		Deleter(Ptr<T> &ptr) : m_ptr(ptr) {}
+
+		~Deleter() {
+			T* value = m_ptr.load();
+			if ( (value != nullptr) && m_ptr.compare_exchange_strong(value, nullptr) )
+				delete value;
+		}
+
+	};
+
+	template<typename T> static T& get(std::atomic<T*> &s_globalValue) {
+		std::unique_ptr<NameTable> emptyPtr;
+		T* value = s_globalValue.load();
+		if (value != nullptr) {
+			return *value;
+		} else {
+			s_globalValue.compare_exchange_strong(value, new T);
+			value = s_globalValue.load();
+			return *value;
+		}
+	}
+};
+
+
 class NameTable {
-private:
+protected:
 	struct Internals;
 	Internals *m_internals;
-
 public:
-	static NameTable& global();
+	static GlobalObject::Ptr<NameTable> s_globalNameTable;
+
+	static NameTable& global() { return GlobalObject::get(s_globalNameTable); }
 
 	Name resolve(const std::string &s);
 
